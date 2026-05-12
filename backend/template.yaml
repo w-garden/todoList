@@ -1,0 +1,163 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Todo App - Java Lambda + DynamoDB + Cognito
+
+Globals:
+  Function:
+    Runtime: java17
+    Timeout: 30
+    MemorySize: 512
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref TodoTable
+  Api:
+    Auth:
+      Authorizers:
+        CognitoAuthorizer:
+          UserPoolArn: !GetAtt UserPool.Arn
+
+Resources:
+
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: todo-app-users
+      AutoVerifiedAttributes: [email]
+      UsernameAttributes: [email]
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireUppercase: false
+          RequireLowercase: false
+          RequireNumbers: false
+          RequireSymbols: false
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: todo-app-client
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      SupportedIdentityProviders: [COGNITO]
+      CallbackURLs:
+        - http://localhost:5173
+        - !Sub "http://${FrontendBucket}.s3-website.${AWS::Region}.amazonaws.com"
+      LogoutURLs:
+        - http://localhost:5173
+        - !Sub "http://${FrontendBucket}.s3-website.${AWS::Region}.amazonaws.com"
+      AllowedOAuthFlows: [code]
+      AllowedOAuthScopes: [openid, email, profile]
+      AllowedOAuthFlowsUserPoolClient: true
+
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: !Sub "todo-app-${AWS::AccountId}"
+      UserPoolId: !Ref UserPool
+
+  TodoTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: todo-items
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: todoId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+        - AttributeName: todoId
+          KeyType: RANGE
+
+  TodoFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: com.hochul.todo.TodoHandler
+      CodeUri: build/libs/todo-app.jar
+      PackageType: Zip
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TodoTable
+      Events:
+        GetTodos:
+          Type: Api
+          Properties:
+            Path: /todos
+            Method: get
+            Auth:
+              Authorizer: CognitoAuthorizer
+        PostTodo:
+          Type: Api
+          Properties:
+            Path: /todos
+            Method: post
+            Auth:
+              Authorizer: CognitoAuthorizer
+        PutTodo:
+          Type: Api
+          Properties:
+            Path: /todos/{todoId}
+            Method: put
+            Auth:
+              Authorizer: CognitoAuthorizer
+        DeleteTodo:
+          Type: Api
+          Properties:
+            Path: /todos/{todoId}
+            Method: delete
+            Auth:
+              Authorizer: CognitoAuthorizer
+        Options:
+          Type: Api
+          Properties:
+            Path: /todos
+            Method: options
+        OptionsTodoId:
+          Type: Api
+          Properties:
+            Path: /todos/{todoId}
+            Method: options
+
+
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "todo-app-frontend-${AWS::AccountId}"
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: index.html
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: s3:GetObject
+            Resource: !Sub "${FrontendBucket.Arn}/*"
+
+Outputs:
+  ApiUrl:
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod"
+  UserPoolId:
+    Value: !Ref UserPool
+  UserPoolClientId:
+    Value: !Ref UserPoolClient
+  CognitoDomain:
+    Value: !Sub "https://todo-app-${AWS::AccountId}.auth.${AWS::Region}.amazoncognito.com"
+  FrontendBucketName:
+    Value: !Ref FrontendBucket
+  FrontendUrl:
+    Value: !Sub "http://${FrontendBucket}.s3-website.${AWS::Region}.amazonaws.com"
