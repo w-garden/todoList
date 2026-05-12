@@ -44,8 +44,10 @@ Resources:
       SupportedIdentityProviders: [COGNITO]
       CallbackURLs:
         - http://localhost:5173
+        - https://d9qp97bsogdcg.cloudfront.net
       LogoutURLs:
         - http://localhost:5173
+        - https://d9qp97bsogdcg.cloudfront.net
       AllowedOAuthFlows: [code]
       AllowedOAuthScopes: [openid, email, profile]
       AllowedOAuthFlowsUserPoolClient: true
