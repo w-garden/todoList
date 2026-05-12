@@ -44,10 +44,8 @@ Resources:
       SupportedIdentityProviders: [COGNITO]
       CallbackURLs:
         - http://localhost:5173
-        - http://todo-app-frontend-312248731562.s3-website.ap-northeast-2.amazonaws.com
       LogoutURLs:
         - http://localhost:5173
-        - http://todo-app-frontend-312248731562.s3-website.ap-northeast-2.amazonaws.com
       AllowedOAuthFlows: [code]
       AllowedOAuthScopes: [openid, email, profile]
       AllowedOAuthFlowsUserPoolClient: true
