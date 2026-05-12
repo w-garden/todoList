@@ -13,6 +13,7 @@ public class Todo {
     private String dueDate;
     private String createdAt;
 
+
     @DynamoDbPartitionKey
     public String getUserId() { return userId; }
     public void setUserId(String userId) { this.userId = userId; }
